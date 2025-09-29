@@ -100,82 +100,82 @@ if check_password():
         """, unsafe_allow_html=True)
 
    # -------------------------- TAB 2 - MARKS ENTRY -------------------------- #
-with tab2:
-    st.header("Enter Student Marks")
-    criteria = ["Accuracy", "Clarity", "Depth", "Completeness", "Presentation"]
+    with tab2:
+        st.header("Enter Student Marks")
+        criteria = ["Accuracy", "Clarity", "Depth", "Completeness", "Presentation"]
 
-    # Try to load student list if available
-    student_list = None
-    id_col, name_col = None, None
-    try:
-        student_list = pd.read_csv("student_list.csv")
-        # Auto-detect ID and Name columns
-        for c in student_list.columns:
-            if "id" in c.lower():
-                id_col = c
-            if "name" in c.lower():
-                name_col = c
-        # Clean up values
-        if student_list is not None:
-            student_list = student_list.astype(str).apply(lambda x: x.str.strip())
-    except FileNotFoundError:
-        pass
-
-    # Load existing assessments
-    try:
-        scores_df = pd.read_csv("student_scores.csv")
-        existing_assessments = scores_df["Assessment"].dropna().unique().tolist()
-    except FileNotFoundError:
-        existing_assessments = []
-
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        # Student selection
-        if student_list is not None and name_col and id_col:
-            student_name = st.selectbox("Select Student Name", student_list[name_col].tolist())
-            match = student_list.loc[student_list[name_col] == student_name, id_col]
-            student_id = match.values[0] if not match.empty else "N/A"
-            st.write(f"**Student ID:** {student_id}")
-        else:
-            student_id = st.text_input("Student ID")
-            student_name = st.text_input("Student Name")
-
-        # Assessment selection (dropdown with existing + option to type new)
-        assessment_options = ["-- New Assessment --"] + existing_assessments
-        selected_assessment = st.selectbox("Select Assessment", assessment_options)
-        if selected_assessment == "-- New Assessment --":
-            assessment = st.text_input("Enter New Assessment Name")
-        else:
-            assessment = selected_assessment
-
-    with col2:
-        scores = {}
-        for crit in criteria:
-            scores[crit] = st.number_input(f"{crit} (0–4)", min_value=0, max_value=4, value=0, step=1)
-
-    # Live calculation
-    total = sum(scores.values())
-    max_score = len(criteria) * 4
-    percentage = (total / max_score) * 100 if max_score > 0 else 0
-    grade = get_letter_grade(percentage)
-    st.info(f"📌 Current Total: **{total}/{max_score}** | Final Score: **{percentage:.1f}%** | Grade: **{grade}**")
-
-    if st.button("Submit Marks"):
-        feedback = get_feedback(percentage)
-        df_new = pd.DataFrame(
-            [[student_id, student_name, assessment, *scores.values(), total, percentage, grade, feedback]],
-            columns=["Student ID", "Name", "Assessment"] + criteria + ["Total", "Percentage", "Grade", "Feedback"]
-        )
+        # Try to load student list if available
+        student_list = None
+        id_col, name_col = None, None
         try:
-            df = pd.read_csv("student_scores.csv")
-            df = pd.concat([df, df_new], ignore_index=True)
+            student_list = pd.read_csv("student_list.csv")
+            # Auto-detect ID and Name columns
+            for c in student_list.columns:
+                if "id" in c.lower():
+                    id_col = c
+                if "name" in c.lower():
+                    name_col = c
+            # Clean up values
+            if student_list is not None:
+                student_list = student_list.astype(str).apply(lambda x: x.str.strip())
         except FileNotFoundError:
-            df = df_new
-        df.to_csv("student_scores.csv", index=False)
+            pass
 
-        st.success(f"Marks for {student_name} (ID: {student_id}, {assessment}) saved successfully! ✅")
-        st.write(df_new)
-        st.info(f"💡 Feedback: *{feedback}*")
+        # Load existing assessments
+        try:
+            scores_df = pd.read_csv("student_scores.csv")
+            existing_assessments = scores_df["Assessment"].dropna().unique().tolist()
+        except FileNotFoundError:
+            existing_assessments = []
+
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            # Student selection
+            if student_list is not None and name_col and id_col:
+                student_name = st.selectbox("Select Student Name", student_list[name_col].tolist())
+                match = student_list.loc[student_list[name_col] == student_name, id_col]
+                student_id = match.values[0] if not match.empty else "N/A"
+                st.write(f"**Student ID:** {student_id}")
+            else:
+                student_id = st.text_input("Student ID")
+                student_name = st.text_input("Student Name")
+
+            # Assessment selection (dropdown with existing + option to type new)
+            assessment_options = ["-- New Assessment --"] + existing_assessments
+            selected_assessment = st.selectbox("Select Assessment", assessment_options)
+            if selected_assessment == "-- New Assessment --":
+                assessment = st.text_input("Enter New Assessment Name")
+            else:
+                assessment = selected_assessment
+
+        with col2:
+            scores = {}
+            for crit in criteria:
+                scores[crit] = st.number_input(f"{crit} (0–4)", min_value=0, max_value=4, value=0, step=1)
+
+        # Live calculation
+        total = sum(scores.values())
+        max_score = len(criteria) * 4
+        percentage = (total / max_score) * 100 if max_score > 0 else 0
+        grade = get_letter_grade(percentage)
+        st.info(f"📌 Current Total: **{total}/{max_score}** | Final Score: **{percentage:.1f}%** | Grade: **{grade}**")
+
+        if st.button("Submit Marks"):
+            feedback = get_feedback(percentage)
+            df_new = pd.DataFrame(
+                [[student_id, student_name, assessment, *scores.values(), total, percentage, grade, feedback]],
+                columns=["Student ID", "Name", "Assessment"] + criteria + ["Total", "Percentage", "Grade", "Feedback"]
+            )
+            try:
+                df = pd.read_csv("student_scores.csv")
+                df = pd.concat([df, df_new], ignore_index=True)
+            except FileNotFoundError:
+                df = df_new
+            df.to_csv("student_scores.csv", index=False)
+
+            st.success(f"Marks for {student_name} (ID: {student_id}, {assessment}) saved successfully! ✅")
+            st.write(df_new)
+            st.info(f"💡 Feedback: *{feedback}*")
 
     # -------------------------- TAB 3 - STUDENT SCORES -------------------------- #
     with tab3:
@@ -208,51 +208,51 @@ with tab2:
             st.info("No student data available yet. Please add marks in the 'Marks Entry' tab.")
 
     # -------------------------- TAB 4 - DASHBOARD -------------------------- #
-with tab4:
-    st.header("📊 Dashboard - Student Performance Overview")
-    try:
-        df = pd.read_csv("student_scores.csv")
+    with tab4:
+        st.header("📊 Dashboard - Student Performance Overview")
+        try:
+            df = pd.read_csv("student_scores.csv")
 
-        # -------------------------- Assessment Filter -------------------------- #
-        assessments = df["Assessment"].dropna().unique().tolist()
-        selected_assessment = st.selectbox("Select Assessment", ["All Assessments"] + assessments)
+            # -------------------------- Assessment Filter -------------------------- #
+            assessments = df["Assessment"].dropna().unique().tolist()
+            selected_assessment = st.selectbox("Select Assessment", ["All Assessments"] + assessments)
 
-        if selected_assessment != "All Assessments":
-            df_filtered = df[df["Assessment"] == selected_assessment]
-        else:
-            df_filtered = df.copy()
+            if selected_assessment != "All Assessments":
+                df_filtered = df[df["Assessment"] == selected_assessment]
+            else:
+                df_filtered = df.copy()
 
-        st.subheader(f"Student Percentage Scores ({selected_assessment})")
-        fig, ax = plt.subplots()
-        ax.bar(df_filtered["Name"], df_filtered["Percentage"], color="skyblue")
-        ax.set_ylabel("Percentage (%)")
-        ax.set_xlabel("Students")
-        ax.set_title("Percentage Scores by Student")
-        plt.xticks(rotation=45, ha="right")
-        st.pyplot(fig)
+            st.subheader(f"Student Percentage Scores ({selected_assessment})")
+            fig, ax = plt.subplots()
+            ax.bar(df_filtered["Name"], df_filtered["Percentage"], color="skyblue")
+            ax.set_ylabel("Percentage (%)")
+            ax.set_xlabel("Students")
+            ax.set_title("Percentage Scores by Student")
+            plt.xticks(rotation=45, ha="right")
+            st.pyplot(fig)
 
-        st.subheader(f"Grade Distribution ({selected_assessment})")
-        grade_counts = df_filtered["Grade"].value_counts()
-        fig2, ax2 = plt.subplots()
-        ax2.pie(grade_counts, labels=grade_counts.index, autopct="%1.1f%%", startangle=90)
-        ax2.axis("equal")
-        st.pyplot(fig2)
+            st.subheader(f"Grade Distribution ({selected_assessment})")
+            grade_counts = df_filtered["Grade"].value_counts()
+            fig2, ax2 = plt.subplots()
+            ax2.pie(grade_counts, labels=grade_counts.index, autopct="%1.1f%%", startangle=90)
+            ax2.axis("equal")
+            st.pyplot(fig2)
 
-        st.subheader(f"Top & Bottom Performers ({selected_assessment})")
-        if not df_filtered.empty:
-            top_student = df_filtered.loc[df_filtered["Percentage"].idxmax()]
-            bottom_student = df_filtered.loc[df_filtered["Percentage"].idxmin()]
-            st.success(f"🏆 Top Performer: **{top_student['Name']}** ({top_student['Percentage']:.1f}%) - {top_student['Grade']}")
-            st.error(f"🔻 Lowest Performer: **{bottom_student['Name']}** ({bottom_student['Percentage']:.1f}%) - {bottom_student['Grade']}")
-        else:
-            st.info("No data available for this assessment.")
+            st.subheader(f"Top & Bottom Performers ({selected_assessment})")
+            if not df_filtered.empty:
+                top_student = df_filtered.loc[df_filtered["Percentage"].idxmax()]
+                bottom_student = df_filtered.loc[df_filtered["Percentage"].idxmin()]
+                st.success(f"🏆 Top Performer: **{top_student['Name']}** ({top_student['Percentage']:.1f}%) - {top_student['Grade']}")
+                st.error(f"🔻 Lowest Performer: **{bottom_student['Name']}** ({bottom_student['Percentage']:.1f}%) - {bottom_student['Grade']}")
+            else:
+                st.info("No data available for this assessment.")
 
-        st.subheader("Download Student Data")
-        csv = df_filtered.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Download Filtered Student Data (CSV)", csv, "student_scores_filtered.csv", "text/csv")
-        
-    except FileNotFoundError:
-        st.info("No student data available yet. Please add marks in the 'Marks Entry' tab.")
+            st.subheader("Download Student Data")
+            csv = df_filtered.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download Filtered Student Data (CSV)", csv, "student_scores_filtered.csv", "text/csv")
+            
+        except FileNotFoundError:
+            st.info("No student data available yet. Please add marks in the 'Marks Entry' tab.")
 
     # -------------------------- TAB 5 - IMPORT STUDENTS -------------------------- #
     with tab5:
