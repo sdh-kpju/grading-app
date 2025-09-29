@@ -6,8 +6,18 @@ import random
 
 # -------------------------- PASSWORD PROTECTION -------------------------- #
 def check_password():
+    st.markdown(
+        """
+        <div style="text-align: center; padding: 20px; border-radius: 10px; background-color: #AB9984;">
+            <h1>🎓 Welcome to the Grading App</h1>
+            <p>Powered by <strong>School of Digital Health</strong></p>
+            <p>Developed by <strong>Pn Afiqah Kamaruddin</strong></p>
+        </div>
+        """, unsafe_allow_html=True
+    )
+
     def password_entered():
-        if st.session_state["password"] == "letmein":  # <-- change password here
+        if st.session_state["password"] == "letmein":
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -22,7 +32,6 @@ def check_password():
         return False
     else:
         return True
-
 
 # -------------------------- MOTIVATIONAL FEEDBACK -------------------------- #
 feedback_dict = {
@@ -76,52 +85,46 @@ def get_letter_grade(percentage):
     else:
         return "D"
 
-
 # -------------------------- APP START -------------------------- #
 if check_password():
     st.title("📊 Tutorial Grading App")
     st.write("Secure grading system with **numerical rubric scoring** (0–4 per criterion).")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["Rubric Reference", "Marks Entry", "Student Scores", "Dashboard", "Import Students"]
+    # -------------------------- SIDEBAR - RUBRIC -------------------------- #
+    st.sidebar.header("Marking Description Criteria (Rubric)")
+    st.sidebar.markdown("""
+    | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
+    |-------|-----------------|---------|--------|-------|--------------|--------------|
+    | **4 (Excellent)** | 80–100% | All correct, precise terminology | Well-structured, logical | Beyond basics | Fully addresses all parts | Neat, organised |
+    | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear | Good understanding | Minor omissions | Mostly neat |
+    | **2 (Fair)**     | 50–64% | Several errors | Sometimes confusing | Basic understanding | Partial response | Somewhat disorganised |
+    | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
+    | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
+    """, unsafe_allow_html=True)
+
+    # -------------------------- TABS -------------------------- #
+    tab2, tab3, tab4, tab5, tab_rubric = st.tabs(
+        ["Marks Entry", "Student Scores", "Dashboard", "Import Students", "Rubric Reference"]
     )
 
-    # -------------------------- TAB 1 - RUBRIC -------------------------- #
-    with tab1:
-        st.header("Marking Description Criteria (Rubric)")
-        st.markdown("""
-        | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
-        |-------|------------------|----------|---------|-------|--------------|--------------|
-        | **4 (Excellent)** | 80–100% | All answers correct, precise terminology | Well-structured, logical, easy to follow | Goes beyond basics, integrates concepts & examples | Fully addresses all parts with detail | Neat, organised, proper formatting |
-        | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear, some gaps | Shows good understanding, some integration | Addresses most parts, minor omissions | Mostly neat, minor lapses |
-        | **2 (Fair)**     | 50–64% | Several errors, partial understanding | Sometimes confusing, incomplete | Basic understanding, limited detail | Partial response, significant gaps | Somewhat disorganised |
-        | **1 (Poor)**     | <50% | Many incorrect answers, lacks understanding | Unclear or missing explanations | Very limited or no understanding | Incomplete, does not address question | Messy, disorganised |
-        | **0 (No Attempt)** | - | No evidence of work | No clarity | No depth | No completeness | No presentation |
-        """, unsafe_allow_html=True)
-
-   # -------------------------- TAB 2 - MARKS ENTRY -------------------------- #
+    # -------------------------- TAB 2 - MARKS ENTRY -------------------------- #
     with tab2:
         st.header("Enter Student Marks")
         criteria = ["Accuracy", "Clarity", "Depth", "Completeness", "Presentation"]
 
-        # Try to load student list if available
+        # Load student list
         student_list = None
         id_col, name_col = None, None
         try:
             student_list = pd.read_csv("student_list.csv")
-            # Auto-detect ID and Name columns
             for c in student_list.columns:
-                if "id" in c.lower():
-                    id_col = c
-                if "name" in c.lower():
-                    name_col = c
-            # Clean up values
-            if student_list is not None:
-                student_list = student_list.astype(str).apply(lambda x: x.str.strip())
+                if "id" in c.lower(): id_col = c
+                if "name" in c.lower(): name_col = c
+            student_list = student_list.astype(str).apply(lambda x: x.str.strip())
         except FileNotFoundError:
             pass
 
-        # Load existing assessments
+        # Existing assessments
         try:
             scores_df = pd.read_csv("student_scores.csv")
             existing_assessments = scores_df["Assessment"].dropna().unique().tolist()
@@ -130,7 +133,6 @@ if check_password():
 
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Student selection
             if student_list is not None and name_col and id_col:
                 student_name = st.selectbox("Select Student Name", student_list[name_col].tolist())
                 match = student_list.loc[student_list[name_col] == student_name, id_col]
@@ -140,7 +142,6 @@ if check_password():
                 student_id = st.text_input("Student ID")
                 student_name = st.text_input("Student Name")
 
-            # Assessment selection (dropdown with existing + option to type new)
             assessment_options = ["-- New Assessment --"] + existing_assessments
             selected_assessment = st.selectbox("Select Assessment", assessment_options)
             if selected_assessment == "-- New Assessment --":
@@ -153,12 +154,11 @@ if check_password():
             for crit in criteria:
                 scores[crit] = st.number_input(f"{crit} (0–4)", min_value=0, max_value=4, value=0, step=1)
 
-        # Live calculation
         total = sum(scores.values())
         max_score = len(criteria) * 4
         percentage = (total / max_score) * 100 if max_score > 0 else 0
         grade = get_letter_grade(percentage)
-        st.info(f"📌 Current Total: **{total}/{max_score}** | Final Score: **{percentage:.1f}%** | Grade: **{grade}**")
+        st.info(f"📌 Total: **{total}/{max_score}** | Score: **{percentage:.1f}%** | Grade: **{grade}**")
 
         if st.button("Submit Marks"):
             feedback = get_feedback(percentage)
@@ -172,8 +172,7 @@ if check_password():
             except FileNotFoundError:
                 df = df_new
             df.to_csv("student_scores.csv", index=False)
-
-            st.success(f"Marks for {student_name} (ID: {student_id}, {assessment}) saved successfully! ✅")
+            st.success(f"Marks for {student_name} ({assessment}) saved ✅")
             st.write(df_new)
             st.info(f"💡 Feedback: *{feedback}*")
 
@@ -185,7 +184,6 @@ if check_password():
             expected_columns = ["Student ID", "Name", "Assessment"] + criteria + ["Total", "Percentage", "Grade", "Feedback"]
             df = df[[col for col in expected_columns if col in df.columns]]
             st.dataframe(df)
-
             st.subheader("Summary Statistics")
             st.write(df.describe())
 
@@ -212,8 +210,6 @@ if check_password():
         st.header("📊 Dashboard - Student Performance Overview")
         try:
             df = pd.read_csv("student_scores.csv")
-
-            # -------------------------- Assessment Filter -------------------------- #
             assessments = df["Assessment"].dropna().unique().tolist()
             selected_assessment = st.selectbox("Select Assessment", ["All Assessments"] + assessments)
 
@@ -250,7 +246,6 @@ if check_password():
             st.subheader("Download Student Data")
             csv = df_filtered.to_csv(index=False).encode("utf-8")
             st.download_button("⬇️ Download Filtered Student Data (CSV)", csv, "student_scores_filtered.csv", "text/csv")
-            
         except FileNotFoundError:
             st.info("No student data available yet. Please add marks in the 'Marks Entry' tab.")
 
@@ -271,3 +266,16 @@ if check_password():
                     st.success("Student list saved for future use.")
             except Exception as e:
                 st.error(f"Error reading Excel file: {e}")
+
+    # -------------------------- TAB RUBRIC -------------------------- #
+    with tab_rubric:
+        st.header("Marking Description Criteria (Rubric)")
+        st.markdown("""
+        | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
+        |-------|-----------------|---------|--------|-------|--------------|--------------|
+        | **4 (Excellent)** | 80–100% | All correct, precise terminology | Well-structured, logical | Beyond basics | Fully addresses all parts | Neat, organised |
+        | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear | Good understanding | Minor omissions | Mostly neat |
+        | **2 (Fair)**     | 50–64% | Several errors | Sometimes confusing | Basic understanding | Partial response | Somewhat disorganised |
+        | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
+        | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
+        """, unsafe_allow_html=True)
