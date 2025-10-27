@@ -5,6 +5,18 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import random
 from io import BytesIO  # for Excel export
+import os
+
+# Ensure test_results.csv exists and load it
+TEST_RESULTS_FILE = "test_results.csv"
+
+if not os.path.exists(TEST_RESULTS_FILE):
+    # Create with proper columns if not found
+    pd.DataFrame(columns=["Test Name", "Student ID", "Student Name", "MCQ Score", "SAQ Score",
+                          "Total Raw", "Scaled (to 100)", "Final Weight (%)", "Weighted Score"]).to_csv(TEST_RESULTS_FILE, index=False)
+
+test_results = pd.read_csv(TEST_RESULTS_FILE)
+
 
 # -------------------------- PASSWORD PROTECTION -------------------------- #
 def check_password():
@@ -89,26 +101,46 @@ def get_letter_grade(percentage):
 
 # -------------------------- APP START -------------------------- #
 if check_password():
-    st.title("📊 Tutorial Grading App")
-    st.write("Secure grading system with **numerical rubric scoring** (0–4 per criterion).")
+    st.title("📊 Grading Application")
+    st.write("Secure grading system with tutorial **numerical rubric scoring** (0–4 per criterion) and for test advancement analysis .")
 
-    # -------------------------- SIDEBAR - RUBRIC -------------------------- #
-    st.sidebar.header("Marking Description Criteria (Rubric)")
-    st.sidebar.markdown("""
-    | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
-    |-------|-----------------|---------|--------|-------|--------------|--------------|
-    | **4 (Excellent)** | 80–100% | All correct, precise terminology | Well-structured, logical | Beyond basics | Fully addresses all parts | Neat, organised |
-    | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear | Good understanding | Minor omissions | Mostly neat |
-    | **2 (Fair)**     | 50–64% | Several errors | Sometimes confusing | Basic understanding | Partial response | Somewhat disorganised |
-    | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
-    | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
-    </div>
-    """, unsafe_allow_html=True)
+    # -------------------------- SIDEBAR NAVIGATION -------------------------- #
+    st.sidebar.title("📚 Navigation")
+
+    # Define sidebar radio buttons (shortcuts to tabs)
+    selected_tab = st.sidebar.radio(
+        "Jump to:",
+        [
+            "Rubric Reference",
+            "Marks Entry",
+            "Student Scores",
+            "Dashboard",
+            "Import Students",
+            "Test Performance"
+        ]
+    )
+
+    # Save selection to session state for persistent tracking
+    st.session_state["selected_tab"] = selected_tab
 
     # -------------------------- TABS -------------------------- #
-    tab2, tab3, tab4, tab5, tab_rubric, tab_test = st.tabs(
-        ["Marks Entry", "Student Scores", "Dashboard", "Import Students", "Rubric Reference", "Test Performance"]
+    tab_rubric, tab2, tab3, tab4, tab5, tab_test = st.tabs(
+        ["Rubric Reference", "Marks Entry", "Student Scores", "Dashboard", "Import Students", "Test Performance"]
     )
+
+    # -------------------------- TAB RUBRIC -------------------------- #
+    with tab_rubric:
+        st.header("Marking Description Criteria (Rubric)")
+        st.markdown("""
+        | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
+        |-------|-----------------|---------|--------|-------|--------------|--------------|
+        | **4 (Excellent)** | 80–100% | All correct, precise terminology | Well-structured, logical | Beyond basics | Fully addresses all parts | Neat, organised |
+        | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear | Good understanding | Minor omissions | Mostly neat |
+        | **2 (Fair)**     | 50–64% | Several errors | Sometimes confusing | Basic understanding | Partial response | Somewhat disorganised |
+        | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
+        | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
+        """, unsafe_allow_html=True)
+
 
     # -------------------------- TAB 2 - MARKS ENTRY -------------------------- #
     with tab2:
@@ -357,12 +389,10 @@ if check_password():
                     st.plotly_chart(fig, use_container_width=True)
 
                 else:
-                    # ✅ Show average instead of latest
                     avg_score = df_filtered["Percentage"].mean()
                     latest_grade = df_filtered["Grade"].iloc[-1]
                     st.metric(f"Average Score for {selected_student}", f"{avg_score:.1f}%", latest_grade)
 
-                    # ---- Student Progress Over Time ----
                     st.subheader(f"📈 Progress Over Time - {selected_student}")
                     fig3 = px.line(
                         df_filtered,
@@ -375,7 +405,6 @@ if check_password():
                     fig3.update_traces(line=dict(color="green"))
                     st.plotly_chart(fig3, use_container_width=True)
 
-                    # 🔽 Student-specific table
                     st.subheader(f"📋 Detailed Scores for {selected_student}")
                     criteria = ["Accuracy", "Clarity", "Depth", "Completeness", "Presentation"]
                     available_columns = [c for c in criteria if c in df.columns]
@@ -384,7 +413,6 @@ if check_password():
                     student_table = df_filtered[base_columns].reset_index(drop=True)
                     st.dataframe(student_table)
 
-                    # Download this student’s data
                     csv = student_table.to_csv(index=False).encode("utf-8")
                     st.download_button(
                         f"⬇️ Download {selected_student}'s Scores (CSV)",
@@ -400,7 +428,6 @@ if check_password():
                 top_n = 5
                 bottom_n = 5
 
-                # Top Performers
                 top_performers = df_overall.nlargest(top_n, "Percentage")
                 fig_top = px.bar(
                     top_performers,
@@ -414,7 +441,6 @@ if check_password():
                 fig_top.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig_top, use_container_width=True)
 
-                # Bottom Performers
                 bottom_performers = df_overall.nsmallest(bottom_n, "Percentage")
                 fig_bottom = px.bar(
                     bottom_performers,
@@ -430,7 +456,6 @@ if check_password():
             else:
                 st.info("No data available for Top & Bottom Performers.")
 
-            # ---- Download ----
             st.subheader("⬇️ Download Student Data")
             csv = df_filtered.to_csv(index=False).encode("utf-8")
             st.download_button("Download Filtered Student Data (CSV)", csv, "student_scores_filtered.csv", "text/csv")
@@ -442,43 +467,76 @@ if check_password():
         st.markdown("---")
         st.subheader("🧪 Test Performance Summary (from Test Performance Tab)")
 
-        try:
-            test_scores = pd.read_csv("student_test_scores.csv")
+        TEST_RESULTS_FILE = "test_results.csv"
 
-            avg_test = (
-                test_scores.groupby("Test")[["Total Marks", "Percentage", "10% Weight"]]
-                .mean()
-                .reset_index()
-            )
+        if os.path.exists(TEST_RESULTS_FILE):
+            test_results = pd.read_csv(TEST_RESULTS_FILE)
 
-            # 🎯 Select Test Filter
-            test_list = ["All Tests"] + sorted(test_scores["Test"].dropna().unique().tolist())
-            selected_test = st.selectbox("Select Test", test_list)
+            required_cols = {"Student Name", "Test Name", "MCQ", "SAQ", "Total", "Weighted"}
+            if not required_cols.issubset(test_results.columns):
+                st.warning("⚠️ Some columns (MCQ/SAQ/Total/Weighted) are missing in test_results.csv.")
+                st.dataframe(test_results.head())
+            else:
+                test_list = ["All Tests"] + sorted(test_results["Test Name"].dropna().unique().tolist())
+                selected_test = st.selectbox("Select Test", test_list, key="tab4_test_filter")
 
-            if selected_test != "All Tests":
-                avg_test = avg_test[avg_test["Test"] == selected_test]
+                df_display = test_results.copy()
+                if selected_test != "All Tests":
+                    df_display = df_display[df_display["Test Name"] == selected_test]
 
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Average Total Marks", f"{avg_test['Total Marks'].mean():.1f}")
-            col2.metric("Average Percentage", f"{avg_test['Percentage'].mean():.1f}%")
-            col3.metric("Average 10% Weight", f"{avg_test['10% Weight'].mean():.2f}")
+                # Calculate averages, min, and max
+                avg_mcq, min_mcq, max_mcq = df_display["MCQ"].mean(), df_display["MCQ"].min(), df_display["MCQ"].max()
+                avg_saq, min_saq, max_saq = df_display["SAQ"].mean(), df_display["SAQ"].min(), df_display["SAQ"].max()
+                avg_total, min_total, max_total = df_display["Total"].mean(), df_display["Total"].min(), df_display["Total"].max()
+                avg_weighted = df_display["Weighted"].mean()
 
-            # Bar chart for test averages
-            fig_test = px.bar(
-                avg_test,
-                x="Test",
-                y="Percentage",
-                color="Test",
-                title="Average Percentage by Test",
-                labels={"Percentage": "Average (%)", "Test": "Test Name"},
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            st.plotly_chart(fig_test, use_container_width=True)
+                # Display metrics with min/max under average
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("MCQ (Avg)", f"{avg_mcq:.1f}", f"Min: {min_mcq:.0f} | Max: {max_mcq:.0f}")
+                col2.metric("SAQ (Avg)", f"{avg_saq:.1f}", f"Min: {min_saq:.0f} | Max: {max_saq:.0f}")
+                col3.metric("Total (Avg)", f"{avg_total:.1f}", f"Min: {min_total:.0f} | Max: {max_total:.0f}")
+                col4.metric("Weighted (Avg %)", f"{avg_weighted:.1f}%", "")
 
-            st.dataframe(avg_test)
+                # Average, Min, Max by Test
+                st.write("### 📈 Average, Min & Max Scores by Test")
+                summary_stats = (
+                    df_display.groupby("Test Name")[["MCQ", "SAQ", "Total", "Weighted"]]
+                    .agg(["mean", "min", "max"])
+                    .reset_index()
+                )
+                # Flatten column names
+                summary_stats.columns = ["Test Name"] + [
+                    f"{col}_{stat}" for col, stat in summary_stats.columns if col != "Test Name"
+                ]
 
-        except FileNotFoundError:
-            st.info("📈 No test performance data available yet. Please add records in the 'Test Performance' tab.")
+                # Melt data for visualization (Average only for chart)
+                avg_scores_melted = (
+                    df_display.groupby("Test Name")[["MCQ", "SAQ", "Total"]]
+                    .mean()
+                    .reset_index()
+                    .melt(id_vars="Test Name", var_name="Category", value_name="Average Score")
+                )
+
+                # Plotly chart: Average scores by Test
+                fig = px.bar(
+                    avg_scores_melted,
+                    x="Test Name",
+                    y="Average Score",
+                    color="Category",
+                    barmode="group",
+                    title="Average MCQ, SAQ, and Total Scores by Test",
+                    labels={"Average Score": "Average Marks", "Test Name": "Test"},
+                    color_discrete_sequence=px.colors.qualitative.Pastel
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Display summary table safely (format only numeric columns)
+                st.write("### 📋 Detailed Test Summary (Average, Min, Max)")
+                numeric_cols = summary_stats.select_dtypes(include=["float64", "int64"]).columns
+                st.dataframe(summary_stats.style.format(subset=numeric_cols, formatter="{:.1f}"))
+
+        else:
+            st.info("📈 No test results yet. Please add some in the 'Test Performance' tab.")
 
     # -------------------------- TAB 5 - IMPORT STUDENTS -------------------------- #
     with tab5:
@@ -510,22 +568,15 @@ if check_password():
                 st.error(f"Error reading uploaded file: {e}")
 
 
-    # -------------------------- TAB RUBRIC -------------------------- #
-    with tab_rubric:
-        st.header("Marking Description Criteria (Rubric)")
-        st.markdown("""
-        | Score | Percentage Range | Accuracy | Clarity | Depth | Completeness | Presentation |
-        |-------|-----------------|---------|--------|-------|--------------|--------------|
-        | **4 (Excellent)** | 80–100% | All correct, precise terminology | Well-structured, logical | Beyond basics | Fully addresses all parts | Neat, organised |
-        | **3 (Good)**     | 65–79% | Mostly correct, minor errors | Generally clear | Good understanding | Minor omissions | Mostly neat |
-        | **2 (Fair)**     | 50–64% | Several errors | Sometimes confusing | Basic understanding | Partial response | Somewhat disorganised |
-        | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
-        | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
-        """, unsafe_allow_html=True)
 
     # -------------------------- TAB 6 - TEST PERFORMANCE -------------------------- #
     with tab_test:
         st.header("🧪 Test Student Performance")
+        st.markdown("---")
+
+        import os
+
+        TEST_RESULTS_FILE = "test_results.csv"
 
         # Load student list if available
         try:
@@ -542,68 +593,107 @@ if check_password():
         col1, col2 = st.columns(2)
 
         with col1:
+            # Select test and student
+            predefined_tests = ["Test 1", "Test 2", "Midterm", "Final"]
+            test_choice = st.selectbox("Select Test Name", predefined_tests + ["Other"], key="tab6_test_choice")
+            if test_choice == "Other":
+                test_name = st.text_input("Enter Custom Test Name", key="tab6_custom_test")
+            else:
+                test_name = test_choice
+
             if student_list is not None and name_col and id_col:
-                test_name = st.selectbox("Select Test", ["Test 1", "Test 2"], key="tab6_test_name")
                 student_name = st.selectbox("Select Student Name", student_list[name_col].tolist(), key="tab6_student_name")
                 match = student_list.loc[student_list[name_col] == student_name, id_col]
                 student_id = match.values[0] if not match.empty else "N/A"
                 st.write(f"**Student ID:** {student_id}")
             else:
-                student_id = st.text_input("Student ID")
-                student_name = st.text_input("Student Name")
+                student_id = st.text_input("Student ID", key="tab6_manual_id")
+                student_name = st.text_input("Student Name", key="tab6_manual_name")
 
-            predefined_tests = ["Test 1", "Test 2", "Midterm", "Final"]
-            test_choice = st.selectbox("Select Test Name", predefined_tests + ["Other"])
-            if test_choice == "Other":
-                test_name = st.text_input("Enter Custom Test Name")
-            else:
-                test_name = test_choice
+            # Test configuration
+            st.markdown("### ⚙️ Test Configuration")
+            mcq_total = st.number_input("Total MCQ Marks", min_value=0, value=20, step=1, key="tab6_mcq_total")
+            saq_total = st.number_input("Total Short Answer Marks", min_value=0, value=30, step=1, key="tab6_saq_total")
+            desired_total = st.number_input("Desired Total Marks (e.g., 100)", min_value=10, value=100, step=10, key="tab6_desired_total")
+            test_weight = st.number_input("Test Weightage (%)", min_value=0.0, value=10.0, step=0.5, key="tab6_weight")
+
+            scaling_factor = desired_total / (mcq_total + saq_total) if (mcq_total + saq_total) > 0 else 1
+            st.write(f"**Scaling Factor:** {scaling_factor:.2f}x")
 
         with col2:
-            objective_marks = st.number_input("Objective Marks (e.g., 0–50)", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
-            short_marks = st.number_input("Short Answer Marks (e.g., 0–50)", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
+            st.markdown("### 🧮 Enter Scores")
+            mcq_score = st.number_input("MCQ Score", min_value=0.0, max_value=float(mcq_total), value=0.0, key="tab6_mcq_score")
+            saq_score = st.number_input("Short Answer Score", min_value=0.0, max_value=float(saq_total), value=0.0, key="tab6_saq_score")
 
-        total_marks = objective_marks + short_marks
-        percentage = min((total_marks / 100) * 100, 100)
-        weighted_10_percent = (percentage / 100) * 10
+            total_score_raw = mcq_score + saq_score
+            total_score_scaled = total_score_raw * scaling_factor
+            weighted_score = (total_score_scaled / desired_total) * test_weight
 
-        st.info(f"**Total Marks:** {total_marks:.1f}/100  |  **Percentage:** {percentage:.1f}%  |  **10% Weight:** {weighted_10_percent:.1f}")
-
-        if st.button("💾 Save Test Performance"):
-            df_new = pd.DataFrame(
-                [[student_id, student_name, test_name, objective_marks, short_marks, total_marks, percentage, weighted_10_percent]],
-                columns=["Student ID", "Name", "Test", "Objective", "Short Answer", "Total Marks", "Percentage", "10% Weight"]
-            )
-
-            try:
-                df = pd.read_csv("student_test_scores.csv")
-                df = pd.concat([df, df_new], ignore_index=True)
-            except FileNotFoundError:
-                df = df_new
-
-            df.to_csv("student_test_scores.csv", index=False)
-            st.success(f"✅ Test performance for {student_name} ({test_name}) saved successfully!")
-            st.dataframe(df_new)
-
-            # Download updated test records
-            excel_buffer = BytesIO()
-            df.to_excel(excel_buffer, index=False, engine="openpyxl")
-            st.download_button(
-                label="⬇️ Download Test Records (Excel)",
-                data=excel_buffer.getvalue(),
-                file_name="student_test_scores.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_excel_test"
-            )
+            st.markdown("---")
+            st.write(f"**Raw Score:** {total_score_raw}/{mcq_total + saq_total}")
+            st.write(f"**Scaled Score:** {total_score_scaled:.2f}/{desired_total}")
+            st.write(f"**Weighted Score:** {weighted_score:.2f}%")
 
         st.markdown("---")
-        st.subheader("📋 View Existing Test Records")
 
-        try:
-            df_view = pd.read_csv("student_test_scores.csv")
-            selected_test = st.selectbox("Filter by Test", ["All"] + sorted(df_view["Test"].unique().tolist()))
-            if selected_test != "All":
-                df_view = df_view[df_view["Test"] == selected_test]
-            st.dataframe(df_view)
-        except FileNotFoundError:
-            st.info("No test records yet. Add new records above to begin tracking performance.")
+        # ------------------- SAVE TEST RESULT ------------------- #
+        if st.button("💾 Save Test Record"):
+            try:
+                columns = ["Student ID", "Student Name", "Test Name", "MCQ", "SAQ", "Total", "Weighted"]
+
+                # Load existing data
+                if os.path.exists(TEST_RESULTS_FILE):
+                    df_existing = pd.read_csv(TEST_RESULTS_FILE)
+                else:
+                    df_existing = pd.DataFrame(columns=columns)
+
+                # Add new record
+                new_data = pd.DataFrame([{
+                    "Student ID": student_id,
+                    "Student Name": student_name,
+                    "Test Name": test_name,
+                    "MCQ": mcq_score,
+                    "SAQ": saq_score,
+                    "Total": total_score_scaled,
+                    "Weighted": weighted_score
+                }])
+
+                # Combine and remove duplicates
+                df_combined = pd.concat([df_existing, new_data], ignore_index=True)
+                df_combined.drop_duplicates(subset=["Student ID", "Test Name"], keep="last", inplace=True)
+
+                # Save to CSV
+                df_combined.to_csv(TEST_RESULTS_FILE, index=False)
+                st.success(f"✅ Test result saved for {student_name} in {test_name}.")
+
+            except Exception as e:
+                st.error(f"❌ Error saving result: {e}")
+
+        # ------------------- DISPLAY AND DELETE ------------------- #
+        if os.path.exists(TEST_RESULTS_FILE):
+            st.subheader("📊 Saved Test Results")
+            df_display = pd.read_csv(TEST_RESULTS_FILE)
+
+            # Filter by test
+            df_filtered = df_display[df_display["Test Name"] == test_name]
+            st.dataframe(df_filtered)
+
+            # Delete record section
+            st.markdown("### ❌ Delete Student Test Record")
+            del_student = st.selectbox(
+                "Select Student to Delete",
+                df_filtered["Student Name"].unique() if not df_filtered.empty else [],
+                key="tab6_delete_student"
+            )
+
+            if st.button("🗑️ Delete Selected Record"):
+                try:
+                    df_display = df_display[
+                        ~((df_display["Student Name"] == del_student) & (df_display["Test Name"] == test_name))
+                    ]
+                    df_display.to_csv(TEST_RESULTS_FILE, index=False)
+                    st.success(f"✅ Deleted record for **{del_student}** in **{test_name}**.")
+                except Exception as e:
+                    st.error(f"Error deleting record: {e}")
+        else:
+            st.info("No saved test results yet.")
