@@ -106,8 +106,8 @@ if check_password():
     """, unsafe_allow_html=True)
 
     # -------------------------- TABS -------------------------- #
-    tab2, tab3, tab4, tab5, tab_rubric = st.tabs(
-        ["Marks Entry", "Student Scores", "Dashboard", "Import Students", "Rubric Reference"]
+    tab2, tab3, tab4, tab5, tab_rubric, tab_test = st.tabs(
+        ["Marks Entry", "Student Scores", "Dashboard", "Import Students", "Rubric Reference", "Test Performance"]
     )
 
     # -------------------------- TAB 2 - MARKS ENTRY -------------------------- #
@@ -253,7 +253,7 @@ if check_password():
                     pd.DataFrame(columns=df.columns).to_csv("student_scores.csv", index=False)
                     st.error("⚠️ All student data has been permanently deleted!")
                     st.rerun()
-
+            
         except FileNotFoundError:
             st.info("No student data available yet. Please add marks in the 'Marks Entry' tab or import in Tab 5.")
 
@@ -297,7 +297,6 @@ if check_password():
                     grade_counts = df_overall["Grade"].value_counts().reset_index()
                     grade_counts.columns = ["Grade", "Count"]
 
-                    # Plotly Pie Chart
                     fig = px.pie(
                         grade_counts,
                         values="Count",
@@ -437,7 +436,49 @@ if check_password():
             st.download_button("Download Filtered Student Data (CSV)", csv, "student_scores_filtered.csv", "text/csv")
 
         except FileNotFoundError:
-            st.info("No student data available yet. Please add marks in the 'Marks Entry' tab or import a file in Tab 5.")
+            st.info("📈 No student data available yet. Please add marks in the 'Marks Entry' tab or import a file in Tab 5.")
+
+        # ------------------ Load and Display Test Performance Summary ------------------ #
+        st.markdown("---")
+        st.subheader("🧪 Test Performance Summary (from Test Performance Tab)")
+
+        try:
+            test_scores = pd.read_csv("student_test_scores.csv")
+
+            avg_test = (
+                test_scores.groupby("Test")[["Total Marks", "Percentage", "10% Weight"]]
+                .mean()
+                .reset_index()
+            )
+
+            # 🎯 Select Test Filter
+            test_list = ["All Tests"] + sorted(test_scores["Test"].dropna().unique().tolist())
+            selected_test = st.selectbox("Select Test", test_list)
+
+            if selected_test != "All Tests":
+                avg_test = avg_test[avg_test["Test"] == selected_test]
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Average Total Marks", f"{avg_test['Total Marks'].mean():.1f}")
+            col2.metric("Average Percentage", f"{avg_test['Percentage'].mean():.1f}%")
+            col3.metric("Average 10% Weight", f"{avg_test['10% Weight'].mean():.2f}")
+
+            # Bar chart for test averages
+            fig_test = px.bar(
+                avg_test,
+                x="Test",
+                y="Percentage",
+                color="Test",
+                title="Average Percentage by Test",
+                labels={"Percentage": "Average (%)", "Test": "Test Name"},
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            st.plotly_chart(fig_test, use_container_width=True)
+
+            st.dataframe(avg_test)
+
+        except FileNotFoundError:
+            st.info("📈 No test performance data available yet. Please add records in the 'Test Performance' tab.")
 
     # -------------------------- TAB 5 - IMPORT STUDENTS -------------------------- #
     with tab5:
@@ -481,3 +522,88 @@ if check_password():
         | **1 (Poor)**     | <50% | Many incorrect answers | Unclear | Very limited | Incomplete | Messy |
         | **0 (No Attempt)** | - | No evidence | No clarity | No depth | No completeness | No presentation |
         """, unsafe_allow_html=True)
+
+    # -------------------------- TAB 6 - TEST PERFORMANCE -------------------------- #
+    with tab_test:
+        st.header("🧪 Test Student Performance")
+
+        # Load student list if available
+        try:
+            student_list = pd.read_csv("student_list.csv")
+            id_col, name_col = None, None
+            for c in student_list.columns:
+                if "id" in c.lower(): id_col = c
+                if "name" in c.lower(): name_col = c
+            student_list = student_list.astype(str).apply(lambda x: x.str.strip())
+        except FileNotFoundError:
+            student_list = None
+            id_col, name_col = None, None
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if student_list is not None and name_col and id_col:
+                test_name = st.selectbox("Select Test", ["Test 1", "Test 2"], key="tab6_test_name")
+                student_name = st.selectbox("Select Student Name", student_list[name_col].tolist(), key="tab6_student_name")
+                match = student_list.loc[student_list[name_col] == student_name, id_col]
+                student_id = match.values[0] if not match.empty else "N/A"
+                st.write(f"**Student ID:** {student_id}")
+            else:
+                student_id = st.text_input("Student ID")
+                student_name = st.text_input("Student Name")
+
+            predefined_tests = ["Test 1", "Test 2", "Midterm", "Final"]
+            test_choice = st.selectbox("Select Test Name", predefined_tests + ["Other"])
+            if test_choice == "Other":
+                test_name = st.text_input("Enter Custom Test Name")
+            else:
+                test_name = test_choice
+
+        with col2:
+            objective_marks = st.number_input("Objective Marks (e.g., 0–50)", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
+            short_marks = st.number_input("Short Answer Marks (e.g., 0–50)", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
+
+        total_marks = objective_marks + short_marks
+        percentage = min((total_marks / 100) * 100, 100)
+        weighted_10_percent = (percentage / 100) * 10
+
+        st.info(f"**Total Marks:** {total_marks:.1f}/100  |  **Percentage:** {percentage:.1f}%  |  **10% Weight:** {weighted_10_percent:.1f}")
+
+        if st.button("💾 Save Test Performance"):
+            df_new = pd.DataFrame(
+                [[student_id, student_name, test_name, objective_marks, short_marks, total_marks, percentage, weighted_10_percent]],
+                columns=["Student ID", "Name", "Test", "Objective", "Short Answer", "Total Marks", "Percentage", "10% Weight"]
+            )
+
+            try:
+                df = pd.read_csv("student_test_scores.csv")
+                df = pd.concat([df, df_new], ignore_index=True)
+            except FileNotFoundError:
+                df = df_new
+
+            df.to_csv("student_test_scores.csv", index=False)
+            st.success(f"✅ Test performance for {student_name} ({test_name}) saved successfully!")
+            st.dataframe(df_new)
+
+            # Download updated test records
+            excel_buffer = BytesIO()
+            df.to_excel(excel_buffer, index=False, engine="openpyxl")
+            st.download_button(
+                label="⬇️ Download Test Records (Excel)",
+                data=excel_buffer.getvalue(),
+                file_name="student_test_scores.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_excel_test"
+            )
+
+        st.markdown("---")
+        st.subheader("📋 View Existing Test Records")
+
+        try:
+            df_view = pd.read_csv("student_test_scores.csv")
+            selected_test = st.selectbox("Filter by Test", ["All"] + sorted(df_view["Test"].unique().tolist()))
+            if selected_test != "All":
+                df_view = df_view[df_view["Test"] == selected_test]
+            st.dataframe(df_view)
+        except FileNotFoundError:
+            st.info("No test records yet. Add new records above to begin tracking performance.")
