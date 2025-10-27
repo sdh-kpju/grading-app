@@ -6,6 +6,7 @@ import plotly.express as px
 import random
 from io import BytesIO  # for Excel export
 import os
+import plotly
 
 # Ensure test_results.csv exists and load it
 TEST_RESULTS_FILE = "test_results.csv"
