@@ -426,8 +426,8 @@ if check_password():
             # ---- Top & Bottom Performers ----
             st.subheader("🏆 Top & Bottom Performers")
             if not df_overall.empty and "Percentage" in df_overall.columns:
-                top_n = 5
-                bottom_n = 5
+                top_n = 10
+                bottom_n = 10
 
                 top_performers = df_overall.nlargest(top_n, "Percentage")
                 fig_top = px.bar(
