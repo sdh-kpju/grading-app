@@ -568,8 +568,6 @@ if check_password():
             except Exception as e:
                 st.error(f"Error reading uploaded file: {e}")
 
-
-
     # -------------------------- TAB 6 - TEST PERFORMANCE -------------------------- #
     with tab_test:
         st.header("🧪 Test Student Performance")
@@ -584,8 +582,10 @@ if check_password():
             student_list = pd.read_csv("student_list.csv")
             id_col, name_col = None, None
             for c in student_list.columns:
-                if "id" in c.lower(): id_col = c
-                if "name" in c.lower(): name_col = c
+                if "id" in c.lower():
+                    id_col = c
+                if "name" in c.lower():
+                    name_col = c
             student_list = student_list.astype(str).apply(lambda x: x.str.strip())
         except FileNotFoundError:
             student_list = None
@@ -637,10 +637,22 @@ if check_password():
 
         st.markdown("---")
 
+        # ------------------- ONE-TIME CLEANUP (optional) ------------------- #
+        # This removes old file with wrong columns — only runs once
+        if "tab6_reset_csv" not in st.session_state:
+            if os.path.exists(TEST_RESULTS_FILE):
+                os.remove(TEST_RESULTS_FILE)
+                st.warning("🧹 Old test_results.csv removed — new clean file will be created.")
+            st.session_state["tab6_reset_csv"] = True
+
         # ------------------- SAVE TEST RESULT ------------------- #
         if st.button("💾 Save Test Record"):
             try:
-                columns = ["Student ID", "Student Name", "Test Name", "MCQ", "SAQ", "Total", "Weighted"]
+                columns = [
+                    "Student ID", "Student Name", "Test Name",
+                    "MCQ", "SAQ", "Raw Score", "Scaled Score",
+                    "Weighted (%)", "Total"
+                ]
 
                 # Load existing data
                 if os.path.exists(TEST_RESULTS_FILE):
@@ -655,8 +667,10 @@ if check_password():
                     "Test Name": test_name,
                     "MCQ": mcq_score,
                     "SAQ": saq_score,
-                    "Total": total_score_scaled,
-                    "Weighted": weighted_score
+                    "Raw Score": total_score_raw,
+                    "Scaled Score": total_score_scaled,
+                    "Weighted (%)": weighted_score,
+                    "Total": desired_total
                 }])
 
                 # Combine and remove duplicates
